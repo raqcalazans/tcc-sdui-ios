@@ -1,8 +1,7 @@
-# Arquivo .gitignore para o projeto Brasileirão (API + iOS)
-
 # Geral & macOS
 #---------------------------------
 .DS_Store
+.xcuserstate
 *.swp
 
 # Java / Maven (Para a API)
