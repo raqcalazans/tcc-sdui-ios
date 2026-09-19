@@ -1,24 +1,34 @@
 import SwiftUI
-import SwiftData
 
 struct GameDetailContainerView: View {
     let gameID: Int
 
-    @Query private var games: [Game]
+    @StateObject private var viewModel: GameDetailViewModel
     
     init(gameID: Int) {
         self.gameID = gameID
-        
-        let predicate = #Predicate<Game> { $0.id == gameID }
-        _games = Query(filter: predicate)
+        _viewModel = StateObject(wrappedValue: GameDetailViewModel(gameID: gameID))
     }
     
     var body: some View {
-        if let game = games.first {
-            GameDetailView(game: game)
-        } else {
-            ProgressView()
-                .navigationTitle(Text("loading_indicator_title"))
+        Group {
+            if let gameDTO = viewModel.game {
+                let game = Game(from: gameDTO)
+                GameDetailView(game: game)
+            } else if viewModel.isLoading {
+                ProgressView()
+                    .navigationTitle(String(localized: "loading_indicator_title"))
+            } else if let errorMessage = viewModel.errorMessage {
+                Text(errorMessage)
+                    .foregroundColor(.red)
+                    .multilineTextAlignment(.center)
+                    .padding()
+            } else {
+                Color.clear
+            }
+        }
+        .task {
+            viewModel.loadGameDetails()
         }
     }
 }

@@ -1,9 +1,7 @@
 import SwiftUI
-import SwiftData
 
 struct GameListView: View {
     
-    @Environment(\.modelContext) var modelContext
     @StateObject private var viewModel: GameListViewModel
     
     init() {
@@ -85,10 +83,6 @@ struct GameListView: View {
             .task {
                 await viewModel.syncGames()
             }
-            
-            .onAppear {
-                viewModel.modelContext = modelContext
-            }
 
             .alert(String(localized: "network_error_alert_title"), isPresented: .constant(viewModel.errorMessage != nil), actions: {
                 Button(String(localized: "alert_button_ok")) { viewModel.errorMessage = nil }
@@ -120,15 +114,5 @@ struct FilterHeaderView: View {
         }
         .foregroundColor(.primary)
         .padding(.vertical, 8)
-    }
-}
-
-#Preview {
-    do {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Game.self, configurations: config)
-        return GameListView().modelContainer(container)
-    } catch {
-        return Text("Falha ao criar o container do preview: \(error.localizedDescription)")
     }
 }

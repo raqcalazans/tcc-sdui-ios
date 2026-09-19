@@ -19,7 +19,8 @@ struct GameView: View {
     let style: GameViewStyle
 
     init?(game: Game, style: GameViewStyle) {
-        guard let homeTeam = game.homeTeam, let awayTeam = game.awayTeam else {
+        guard let homeTeam = game.homeTeam,
+              let awayTeam = game.awayTeam else {
             return nil
         }
 

@@ -41,6 +41,13 @@
 			);
 			target = 160AC4C82E316282003D13A2 /* Brasileirao */;
 		};
+		16DA59D7305DBDD100CB5576 /* Exceptions for "Brasileirao" folder in "BrasileiraoTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Screens/FanRegistration/FanRegistrationViewModel.swift,
+			);
+			target = 1624F5372E39179F0053DEDC /* BrasileiraoTests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -48,6 +55,7 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				160AC5492E317DB9003D13A2 /* Exceptions for "Brasileirao" folder in "Brasileirao" target */,
+				16DA59D7305DBDD100CB5576 /* Exceptions for "Brasileirao" folder in "BrasileiraoTests" target */,
 			);
 			path = Brasileirao;
 			sourceTree = "<group>";
