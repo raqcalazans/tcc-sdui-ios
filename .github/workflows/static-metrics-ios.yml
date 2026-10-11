@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      analysis_ref:
+        description: 'Branch, tag, or full commit SHA to analyze (leave empty for the triggering commit)'
+        required: false
+        default: ''
   schedule:
     - cron: '37 8 * * 1'
 
@@ -13,13 +18,22 @@ permissions:
 
 jobs:
   metrics:
+    if: ${{ contains(github.repository, '-ios') }}
     runs-on: macos-15
+    env:
+      ANALYSIS_REF_INPUT: ${{ inputs.analysis_ref }}
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        id: checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.analysis_ref || github.sha }}
+      - name: Record analyzed commit
+        id: analyzed
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -31,36 +45,104 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p metrics
+          source_root='AmantesDoFutebol/AmantesDoFutebol'
+          candidates=()
+          while IFS= read -r file; do candidates+=("$file"); done \
+            < <(find "$source_root" -type f -name '*.swift' | sort)
+          if [[ ${#candidates[@]} -eq 0 ]]; then
+            echo "No Swift files found under ${source_root}." >&2
+            exit 1
+          fi
           swift_files=()
+          excluded_files=()
           while IFS= read -r file; do
-            swift_files+=("$file")
-          done < <(find . -type f -name '*.swift' \
-            -not -path '*/AmantesDoFutebolTests/*' \
-            -not -path '*/AmantesDoFutebolUITests/*' \
-            -not -path '*/Pods/*' \
-            -not -path '*/DerivedData/*' \
-            -not -path '*/.build/*' | sort)
+            case "$(basename "$file")" in
+              UITestURLProtocol.swift|FanScreenJSONFixtures.swift|ScreenshotPreviewNetworkService.swift)
+                excluded_files+=("$file")
+                ;;
+              *) swift_files+=("$file") ;;
+            esac
+          done < <(printf '%s\n' "${candidates[@]}")
           if [[ ${#swift_files[@]} -eq 0 ]]; then
             echo 'No production Swift files found.' >&2
             exit 1
           fi
+          printf '%s\n' "${swift_files[@]}" > metrics/source-files-included.txt
+          if [[ ${#excluded_files[@]} -gt 0 ]]; then
+            printf '%s\n' "${excluded_files[@]}" > metrics/source-files-excluded.txt
+          else
+            : > metrics/source-files-excluded.txt
+          fi
           lizard --language swift --csv "${swift_files[@]}" > metrics/lizard-swift.csv
+          python - <<'PY'
+          import csv
+          from pathlib import Path
+
+          csv_path = Path("metrics/lizard-swift.csv")
+          rows = list(csv.reader(csv_path.open(newline="", encoding="utf-8")))
+          if not rows:
+              raise SystemExit("Lizard CSV has no function/method rows")
+          for line_number, row in enumerate(rows, start=1):
+              if len(row) != 11:
+                  raise SystemExit(f"CSV row {line_number}: expected 11 columns, got {len(row)}")
+              for index in (0, 1, 2, 3, 4, 9, 10):
+                  try:
+                      value = int(row[index])
+                  except ValueError as error:
+                      raise SystemExit(f"CSV row {line_number}, column {index + 1}: not an integer") from error
+                  if value < 0:
+                      raise SystemExit(f"CSV row {line_number}, column {index + 1}: negative value")
+              if not row[6] or not row[7] or int(row[10]) < int(row[9]):
+                  raise SystemExit(f"CSV row {line_number}: invalid source/function/line range")
+          Path("metrics/csv-validation.txt").write_text(
+              f"status=valid\nfunction_or_method_rows={len(rows)}\ncolumn_count=11\n",
+              encoding="utf-8",
+          )
+          Path("metrics/csv-schema.txt").write_text(
+              "1=NLOC (non-comment lines per function/method)\n"
+              "2=CCN (cyclomatic complexity)\n"
+              "3=token_count\n"
+              "4=parameter_count\n"
+              "5=function_length (source lines)\n"
+              "6=location_label\n"
+              "7=source_file\n"
+              "8=function_name\n"
+              "9=qualified_function_signature\n"
+              "10=start_line\n"
+              "11=end_line\n",
+              encoding="utf-8",
+          )
+          PY
           {
             echo "repository=${GITHUB_REPOSITORY}"
-            echo "commit=${GITHUB_SHA}"
+            echo "commit=$(git rev-parse HEAD)"
             echo "ref=${GITHUB_REF}"
+            echo "requested_analysis_ref=${ANALYSIS_REF_INPUT:-triggering-commit}"
+            echo "event_name=${GITHUB_EVENT_NAME}"
             echo "captured_at_utc=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            echo "run_id=${GITHUB_RUN_ID}"
+            echo "run_attempt=${GITHUB_RUN_ATTEMPT}"
+            echo "run_url=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo "workflow_ref=${GITHUB_WORKFLOW_REF}"
+            echo "workflow_sha=${GITHUB_WORKFLOW_SHA}"
+            echo "runner_os=${RUNNER_OS}"
+            echo "runner_image_os=${ImageOS:-unavailable}"
+            echo "runner_image_version=${ImageVersion:-unavailable}"
+            echo "python_version=$(python --version 2>&1)"
             echo "lizard_version=$(lizard --version 2>&1 | head -n 1)"
             echo "swift_version=$(swift --version | head -n 1)"
-            echo "source_file_count=${#swift_files[@]}"
-            echo "source_scope=production Swift files"
-            echo "excluded=unit tests, UI tests, Pods, DerivedData, .build"
+            echo "source_scope=Swift files under ${source_root}"
+            echo "source_candidates=${#candidates[@]}"
+            echo "source_files_analyzed=${#swift_files[@]}"
+            echo "source_files_excluded=${#excluded_files[@]}"
+            echo "exclusion_rules=AmantesDoFutebolTests; AmantesDoFutebolUITests; Pods; DerivedData; .build; UITestURLProtocol.swift; FanScreenJSONFixtures.swift; ScreenshotPreviewNetworkService.swift"
+            echo "csv_sha256=$(shasum -a 256 metrics/lizard-swift.csv | awk '{print $1}')"
           } > metrics/metadata.txt
 
       - name: Preserve raw results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: ios-static-metrics-${{ github.sha }}
+          name: ios-static-metrics-${{ steps.analyzed.outputs.sha }}-run-${{ github.run_id }}
           path: metrics/
           if-no-files-found: error
           retention-days: 90
