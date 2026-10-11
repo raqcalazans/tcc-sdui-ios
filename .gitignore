@@ -1,57 +1,6 @@
-# Geral & macOS
-#---------------------------------
 .DS_Store
-.xcuserstate
-*.swp
-
-# Java / Maven (Para a API)
-#---------------------------------
-# Arquivos de log
-*.log
-logs/
-
-# Pasta de build do Maven
-/target/
-
-# Arquivos gerados pelo Maven
-.mvn/
-mvnw
-mvnw.cmd
-
-# Configurações de IDEs (IntelliJ, VSCode, Eclipse)
-.idea/
-*.iml
-*.iws
-.classpath
-.project
-.settings/
-.vscode/
-
-# Arquivos de pacotes Java
-*.jar
-*.war
-*.ear
-
-
-# Swift / Xcode (Para o App iOS)
-#---------------------------------
-# Arquivos de build e cache
-build/
+xcuserdata/
+*.xcuserstate
 DerivedData/
-.build/
-
-# Configurações de usuário do Xcode (MUITO IMPORTANTE)
-# Isso ignora o UserInterfaceState.xcuserstate e outros arquivos pessoais.
-*.xcodeproj/project.xcworkspace/
-*.xcodeproj/xcuserdata/
-*.xcworkspace/xcshareddata/
-*.xcworkspace/xcuserdata/
-
-# Swift Package Manager
-Packages/
-*.xcodeproj/project.pbxproj
-!Podfile.lock
-
-# Playgrounds
-timeline.xctimeline
-playground.xcworkspace
+build/
+*.xcresult
